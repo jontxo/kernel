@@ -9,8 +9,8 @@
  * published by the Free Software Foundation.
 */
 
-#include "exynos7870.dtsi"
 #include "exynos7870-rmem-3000MB-WUXGA.dtsi"
+#include "exynos7870.dtsi"
 #include "exynos7870-gtactive2lte-common-ccic-s2mm005_01.dtsi"
 
 / {
@@ -401,8 +401,8 @@
 		if_pmic_rstb: if-pmic-rstb {
 			samsung,pins = "gpc6-2";
 			samsung,pin-function = <1>;
-			samsung,pin-pud = <3>;
-			samsung,pin-con-pdn = <3>;
+			samsung,pin-pud = <0>;
+			samsung,pin-con-pdn = <0>;
 		};
 	};
 
@@ -425,7 +425,7 @@
 
 	i2c@13870000 {
 		status = "okay";
-		clock-frequency = <400000>;
+		samsung,i2c-max-bus-freq = <400000>;
 
 		sm5705@49 {
 			status = "okay";
@@ -446,6 +446,7 @@
 					used-gpio-control = <1>;
 					flash-en-gpio = <&gpd3 5 0>;
 					torch-en-gpio = <&gpd3 7 0>;
+					torch_table = <30 60 90 130 180>;
 				};
 				led2 {
 					ledname = "leds-sm5705-fled1";
@@ -466,6 +467,7 @@
 			muic-universal,chip_name = "sm,sm5705";
 			muic-universal,irq-gpio = <&gpa2 6 0>;
 			muic-universal,wakeup;
+			muic,undefined_range;
 
 			usb-id-ctr = <&gpc6 3 0>;
 			mux-sel = <&gpc5 1 0>;
@@ -482,19 +484,20 @@
 					"-HMT:49.9K",
 					"+POGO:49.9K",
 					"-Audiodock:64.9K",
-					"+USB LANHUB:80.07K",
+					"-USB LANHUB:80.07K",
 					"-Charging Cable:102K",
 					"-Universal Multimedia dock:121K",
 					"+Jig USB Off:255K",
 					"+Jig USB On:301K",
-					"+Deskdock:365K",
-					"+TYPE2 Charger:442K",
+					"-Deskdock:365K",
+					"-TYPE2 Charger:442K",
 					"+Jig UART Off:523K",
 					"+Jig UART On:619K",
 					"+TA:OPEN",
 					"+USB:OPEN",
 					"+CDP:OPEN",
-					"+Undefined Charging:XXX";
+					"+Charging POGO VB:OPEN",
+					"-Undefined Charging:XXX";
 	};
 
 	i2c@13840000 {
@@ -515,7 +518,8 @@
 			stm,regulator_dvdd = "tsp_dvdd";
 			stm,regulator_avdd = "tsp_avdd";
 			stm,firmware_name = "tsp_stm/fts8cd56_gtactive2.fw";
-			stm,pat_function = <1>;
+			stm,pat_function = <2>;
+			stm,afe_base = <0xE881>;
 		};
 	};
 
@@ -638,14 +642,13 @@
 		status = "okay";
 		samsung,scl-clk-stretching;
 		samsung,transfer_delay = <50>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&hs_i2c6_bus &wacom_pwr_en>;
+		pinctrl-names = "default","on_state", "off_state";
+		pinctrl-0 = <&hs_i2c6_bus &epen_irq &wacom_pwr_en>;
+		pinctrl-1 = <&epen_irq &wacom_pwr_en>;
+		pinctrl-2 = <&epen_input>;
 		wacom@56 {
 			compatible = "wacom,w90xx";
 			reg = <0x56>;
-			pinctrl-names = "on_irq", "off_state";
-			pinctrl-0 = <&epen_irq>;
-			pinctrl-1 = <&epen_input>;
 			interrupts = <3 0 0>;
 			interrupt-parent = <&gpa0>;
 			vddo-supply = <&wacom_ldo_en>;
@@ -1635,27 +1638,38 @@
 
 	dsim_0: dsim@14800000 {
 		lcd_info = <&s6d7aa0_wxga>;
-		decon_board = <&decon_board_list>;
+		decon_board = <&decon_board>;
 		status = "okay";
 	};
 
-	decon_board_list: decon_board_list {
+	decon_board: decon_board {
+		gpio_buck_en = <&gpd3 4 0x1>;
+		gpio_lcd_rst = <&gpd4 1 0x1>;
+
 		dsim_set_panel_power_enable {
-			type = "regulator,enable", "delay,usleep", "gpio,high", "delay,usleep";
-			gpios = <&gpd3 4 0x1>;
-			regulator = "LCD_1P8";
-			delay = <5000 6000>, <15000 16000>;
+			type =
+			"regulator,enable",	"LCD_1P8",
+			"delay,usleep",	"1000 1100",
+			"gpio,high",	"gpio_buck_en",
+			"delay,usleep",	"1000 1100";
 		};
 		dsim_set_panel_power_disable {
-			type = "gpio,low", "gpio,low", "delay,usleep", "regulator,disable";
-			gpios = <&gpd4 1 0x1>, <&gpd3 4 0x1>;
-			regulator = "LCD_1P8";
-			delay = <1000 2000>;
+			type =
+			"delay,usleep",	"1000 1100",
+			"gpio,low",	"gpio_lcd_rst",
+			"delay,usleep",	"1000 1100",
+			"gpio,low",	"gpio_buck_en",
+			"delay,usleep",	"5000 6000",
+			"regulator,disable",	"LCD_1P8";
 		};
 		dsim_reset_panel {
-			type = "gpio,high", "delay,usleep", "gpio,low", "delay,usleep", "gpio,high", "delay,usleep";
-			gpios = <&gpd4 1 0x1>, <&gpd4 1 0x1>, <&gpd4 1 0x1>;
-			delay = <5000 6000>, <500 1000>, <50000 51000>;
+			type =
+			"gpio,high",	"gpio_lcd_rst",
+			"delay,usleep",	"5000 6000",
+			"gpio,low",	"gpio_lcd_rst",
+			"delay,usleep",	"5000 6000",
+			"gpio,high",	"gpio_lcd_rst",
+			"delay,usleep",	"10000 11000";
 		};
 	};
 
@@ -1666,11 +1680,11 @@
 		ddi_type = <0>;
 		timing,refresh = <60>;
 		/* HBP HFP HSW */
-		timing,h-porch = <64 16 4>;
+		timing,h-porch = <48 16 16>;
 		/* VBP VFP VSW */
 		timing,v-porch = <6 8 2>;
-		timing,dsi-hs-clk = <480>;
-		timing,pms = <13 480 1>;
+		timing,dsi-hs-clk = <500>;
+		timing,pms = <1 77 2>;
 		timing,dsi-escape-clk = <16>;
 	};
 
@@ -1781,6 +1795,13 @@
 			sec_vib,max_timeout = <10000>;
 			sec_vib,ldo_type = <1>;		/* 0: pmic ldo, 1: external ldo */
 			sec_vib,ldo_en = <&gpf4 0 0>;
+		};
+	};
+
+	i2c@13850000 {
+		usbpd-s2mm005@33 {
+			compatible = "sec-s2mm005,i2c";
+			usbpd,skip-ccic-fwupdate;
 		};
 	};
 };

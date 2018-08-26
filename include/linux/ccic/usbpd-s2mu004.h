@@ -12,8 +12,12 @@
  * GNU General Public License for more details.
  *
  */
+#if defined(CONFIG_IFPMIC_SUPPORT)
+#include <linux/ifpmic/ccic/usbpd-s2mu004.h>
+#else
 #include <linux/ccic/pdic_notifier.h>
 #include <linux/ccic/usbpd_msg.h>
+#endif
 
 #ifndef __USBPD_S2MU004_H__
 #define __USBPD_S2MU004_H__

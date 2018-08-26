@@ -1,3 +1,7 @@
+#if defined(CONFIG_IFPMIC_SUPPORT)
+#include <linux/ifpmic/ccic/usbpd.h>
+#endif
+
 #ifndef __USBPD_H__
 #define __USBPD_H__
 

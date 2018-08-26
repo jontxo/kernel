@@ -17,13 +17,13 @@
 #include "exynos7870-gtactive2lte_fingerprint-sensor_02.dtsi"
 
 / {
-	model = "Samsung Galaxy Tab Active2 WIFI rev02 board based on Exynos7870";
+	model = "Samsung Galaxy Tab Active2 WIFI rev01 board based on Exynos7870";
         model_info-chip = <7870>;
         model_info-platform = "android";
         model_info-subtype = "samsung";
         model_info-hw_rev = <2>;
         model_info-hw_rev_end = <2>;
-	compatible = "samsung, Galaxy Tab Active2 WIFI 02", "samsung,exynos7870";
+	compatible = "samsung, Galaxy Tab Active2 WIFI 01", "samsung,exynos7870";
 
 	cnss_dcdc_en: cnss_dcdc_en {
 		compatible = "regulator-fixed";
@@ -51,6 +51,7 @@
 			samsung,pin-pud = <0>;
 			samsung,pin-drv = <0>;
 		};
+		/delete-node/ bt-btwake;
 	};
 
 	i2c@13860000 {
@@ -420,6 +421,7 @@
 					<&but_zones 114 493 1300>; /* vol down */
 			mic-adc-range = <1367>;
 			mic-det-delay = <550>;
+			water-threshold-max = <2250>;
 			water-threshold-min1 = <550>;
 		};
 	};
@@ -493,11 +495,11 @@
 	s1402x: s1402x@14880000 {
 		pinctrl-names = "default", "idle", "bt", "bt-idle";
 		pinctrl-0 = <&i2s_pmic_amp_bus
-			&i2s_bt_bus>;
+			&i2s_amp_bus>;
 		pinctrl-1 = <&i2s_pmic_amp_bus_idle
 			&i2s_bt_bus_idle> ;
 		pinctrl-2 = <&i2s_pmic_bus
-			&i2s_amp_bus>;
+			&i2s_bt_bus>;
 		pinctrl-3 = <&i2s_bt_bus_idle>;
 
 		/delete-property/ bck-mcko-mode;
@@ -522,14 +524,25 @@
 			samsung,pin-function = <2>;
 			samsung,pin-pud = <0>;
 		};
-
+		bt_en: bt-en {
+			samsung,pins ="gpd4-0";
+			samsung,pin-function = <1>;
+			samsung,pin-pud = <0>;
+			samsung,pin-con-pdn = <3>;
+			samsung,pin-pud-pdn = <0>;
+		};
 		acc_int: acc_int {
 			samsung,pins = "gpd4-3";
 			samsung,pin-function = <0xF>;
 			samsung,pin-pud = <0>;
 			samsung,pin-drv = <0>;
 		};
-
+		bt_btwake: bt-btwake {
+			samsung,pins = "gpd4-5";
+			samsung,pin-function = <1>;
+			samsung,pin-pud = <1>;
+			samsung,pin-pud-pdn = <0>;
+		};
 		sensor_ldo_en: sensor_ldo_en {
 			samsung,pins = "gpf4-2";
 			samsung,pin-function = <1>;
@@ -549,32 +562,49 @@
 		regulator-name = "tsp_avdd";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpio = <&gpa1 2 0>;
+        gpio = <&gpa1 2 0>;
 		enable-active-high;
 	};
-		
+
+	pinctrl@139F0000 {
+		tsp_en: tsp-en {
+			samsung,pins = "gpa1-2";
+			samsung,pin-function = <0x1>;
+			samsung,pin-pud = <0>;
+			samsung,pin-drv = <0>;
+		};
+	};
+
+	i2c@13840000 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c3_bus &tsp_en>;
+		touchscreen@49 {
+			stm,bringup = <2>;
+		};
+	};
+
 	pinctrl@139B0000 {
 		uart1_rts: uart1-rts {
 			samsung,pins = "gpd2-3";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
-			samsung,pin-con-pdn = <1>;
-			samsung,pin-pud-pdn = <3>;
+			samsung,pin-pud = <1>;
+			samsung,pin-con-pdn = <3>;
+			samsung,pin-pud-pdn = <1>;
 		};
 
 		uart1_cts: uart1-cts {
 			samsung,pins = "gpd2-2";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
-			samsung,pin-con-pdn = <2>;
-			samsung,pin-pud-pdn = <3>;
+			samsung,pin-pud = <1>;
+			samsung,pin-con-pdn = <3>;
+			samsung,pin-pud-pdn = <1>;
 		};
 
 		uart1_tx: uart1-tx {
 			samsung,pins = "gpd2-1";
 			samsung,pin-function = <2>;
 			samsung,pin-pud = <3>;
-			samsung,pin-con-pdn = <1>;
+			samsung,pin-con-pdn = <3>;
 			samsung,pin-pud-pdn = <3>;
 		};
 
@@ -582,18 +612,24 @@
 			samsung,pins = "gpd2-0";
 			samsung,pin-function = <2>;
 			samsung,pin-pud = <3>;
-			samsung,pin-con-pdn = <2>;
+			samsung,pin-con-pdn = <3>;
 			samsung,pin-pud-pdn = <3>;
 		};
 	};
-	
+
+	tsp_avdd {
+		compatible = "regulator-fixed";
+		regulator-name = "tsp_avdd";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpa1 2 0>;
+		enable-active-high;
+	};
+
 	serial_1: uart@13800000 {
 		status = "okay";
-	};
-	
-	serial@13800000 {
-	    pinctrl-names = "default";
-		pinctrl-6 = <&uart1_rts &uart1_cts &uart1_tx &uart1_rx>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart1_rts &uart1_cts &uart1_tx &uart1_rx>;
 	};
 
 	gps {

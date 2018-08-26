@@ -106,38 +106,51 @@ int kasnprintf(struct kasnprintf_buf *buf, const char *fmt, ...)
 	return i;
 }
 
+static inline void kasnprintf_buf_reset(struct kasnprintf_buf *buf)
+{
+	kfree(buf->buf);
+	buf->buf = NULL;
+	buf->size = 0;
+	buf->off = 0;
+}
+
 ssize_t debug_generic_read(struct file *file, char __user *user_buf,
 			   size_t count, loff_t *ppos,
 			   int (*function)(struct kasnprintf_buf *buf))
 {
+	struct kasnprintf_buf *buf = file->private_data;
+	int ret = 0;
+
+	mutex_lock(&buf->mutex);
 	/* Add/update buffer */
-	if (!file->private_data || !*ppos) {
-		struct kasnprintf_buf *buf, *old_buf;
-		int ret;
-
-		buf = kzalloc(GFP_KERNEL, sizeof(*buf));
-		if (!buf)
-			return -ENOMEM;
-
-		buf->gfp = GFP_KERNEL;
+	if (!*ppos) {
+		kasnprintf_buf_reset(buf);
 		ret = function(buf);
 		if (ret < 0) {
-			kfree(buf);
-			return ret;
+			kasnprintf_buf_reset(buf);
+			goto end;
+		}
 		}
 
-		old_buf = file->private_data;
-		file->private_data = buf;
-		kfree(old_buf);
+	ret = simple_read_from_buffer(user_buf, count, ppos, buf->buf,
+									buf->off);
+	
+	end:
+		mutex_unlock(&buf->mutex);
+		return ret;
 	}
 
-	if (file->private_data) {
-		struct kasnprintf_buf *buf = file->private_data;
+int debug_generic_open(struct inode *inode, struct file *file)
+{
+	struct kasnprintf_buf *buf;
 
-		return simple_read_from_buffer(user_buf, count, ppos, buf->buf,
-					       buf->off);
-	}
+	file->private_data = kzalloc(sizeof(*buf), GFP_KERNEL);
+	if (!file->private_data)
+		return -ENOMEM;
 
+	buf = file->private_data;
+	mutex_init(&buf->mutex);
+	buf->gfp = GFP_KERNEL;
 	return 0;
 }
 
@@ -145,7 +158,10 @@ int debug_generic_release(struct inode *inode, struct file *file)
 {
 	struct kasnprintf_buf *buf = file->private_data;
 
-	kfree(buf->buf);
+	if (!buf)
+		return 0;
+
+	kasnprintf_buf_reset(buf);
 	kfree(buf);
 	return 0;
 }
@@ -160,6 +176,7 @@ static ssize_t debug_structs_read(struct file *file, char __user *user_buf,
 static const struct file_operations mc_debug_structs_ops = {
 	.read = debug_structs_read,
 	.llseek = default_llseek,
+	.open = debug_generic_open,
 	.release = debug_generic_release,
 };
 
@@ -402,8 +419,13 @@ static int mobicore_start(void)
 	}
 #endif
 
+	ret = device_user_init();
+	if (ret)
+		goto err_create_dev_user;
+
 	return 0;
 
+err_create_dev_user:
 #ifdef MC_PM_RUNTIME
 	unregister_reboot_notifier(&main_ctx.reboot_notifier);
 	unregister_pm_notifier(&main_ctx.pm_notifier);
@@ -445,6 +467,7 @@ static ssize_t debug_sessions_read(struct file *file, char __user *user_buf,
 static const struct file_operations mc_debug_sessions_ops = {
 	.read = debug_sessions_read,
 	.llseek = default_llseek,
+	.open = debug_generic_open,
 	.release = debug_generic_release,
 };
 
@@ -458,6 +481,7 @@ static ssize_t debug_mcpcmds_read(struct file *file, char __user *user_buf,
 static const struct file_operations mc_debug_mcpcmds_ops = {
 	.read = debug_mcpcmds_read,
 	.llseek = default_llseek,
+	.open = debug_generic_open,
 	.release = debug_generic_release,
 };
 
@@ -603,11 +627,7 @@ static int mobicore_probe(struct platform_device *pdev)
 	*/
 	err = device_admin_init();
 	if (err)
-		goto fail_create_dev;
-
-	err = device_user_init();
-	if (err)
-		goto fail_create_dev;
+		goto fail_creat_dev_admin;
 
 	/*
 	 * ExySp: for sos performance
@@ -617,7 +637,7 @@ static int mobicore_probe(struct platform_device *pdev)
 
 		return 0;
 
-fail_create_dev:
+fail_creat_dev_admin:
 	mc_scheduler_exit();
 fail_mc_device_sched_init:
 	mc_logging_exit();

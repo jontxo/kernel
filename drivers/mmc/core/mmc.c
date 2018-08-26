@@ -783,8 +783,11 @@ out:
 }
 
 #ifdef CONFIG_MMC_UNIQUE_NUMBER
-static char *mmc_gen_unique_number(struct mmc_card *card)
+static ssize_t mmc_gen_unique_number_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
 {
+	struct mmc_card *card = mmc_dev_to_card(dev);
 	char gen_pnm[3];
 	int i;
 
@@ -812,8 +815,8 @@ static char *mmc_gen_unique_number(struct mmc_card *card)
 		if (gen_pnm[i] >= 'a' && gen_pnm[i] <= 'z')
 			gen_pnm[i] -= ('a' - 'A');
 	}
-	return kasprintf(GFP_KERNEL, "C%s%02X%08X%02X",
-		gen_pnm, card->cid.prv, card->cid.serial, UNSTUFF_BITS(card->raw_cid, 8, 8));
+	return sprintf(buf, "C%s%02X%08X%02X\n",
+			gen_pnm, card->cid.prv, card->cid.serial, UNSTUFF_BITS(card->raw_cid, 8, 8));
 }
 #endif
 
@@ -851,7 +854,7 @@ MMC_DEV_ATTR(erase_type, "MMC_CAP_ERASE %s, type %s, SECURE %s, Sanitize %s\n",
 		 !(card->quirks & MMC_QUIRK_SEC_ERASE_TRIM_BROKEN)) ?
 		"enabled" : "disabled");
 #ifdef CONFIG_MMC_UNIQUE_NUMBER
-MMC_DEV_ATTR(unique_number, "%s\n", mmc_gen_unique_number(card));
+static DEVICE_ATTR(unique_number, (S_IRUSR|S_IRGRP), mmc_gen_unique_number_show, NULL);
 #endif
 
 static struct attribute *mmc_std_attrs[] = {

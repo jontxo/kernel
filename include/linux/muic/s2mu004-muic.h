@@ -17,6 +17,10 @@
  *
  */
 
+#if defined(CONFIG_IFPMIC_SUPPORT)
+#include <linux/ifpmic/muic/s2mu004-muic.h>
+#endif
+
 #ifndef __S2MU004_MUIC_H__
 #define __S2MU004_MUIC_H__
 
@@ -399,7 +403,7 @@ struct s2mu004_muic_data {
 #endif
 	int bcd_rescan_cnt;
 #endif
-	
+
 #if defined(CONFIG_HV_MUIC_S2MU004_AFC)
 	bool				is_afc_muic_ready;
 	bool				is_afc_handshaking;
@@ -420,7 +424,7 @@ struct s2mu004_muic_data {
 	u8				status1;
 	u8				status2;
 	u8				status3;
-	u8				status4;	
+	u8				status4;
 
 	/* muic hvcontrol value */
 	u8				hvcontrol1;

@@ -213,10 +213,29 @@ static int s2mu004_usbpd_bulk_read(struct i2c_client *i2c, u8 reg, int count, u8
 #if defined(CONFIG_USB_HW_PARAM)
 	struct otg_notify *o_notify = get_otg_notify();
 #endif
+#ifdef CONFIG_SEC_FACTORY
+	int retry = 0;
+#endif
 
 	ret = i2c_smbus_read_i2c_block_data(i2c, reg, count, buf);
+#ifdef CONFIG_SEC_FACTORY
+	for (retry = 0; retry < 5; retry++) {
+		if (ret < 0) {
+			dev_err(dev, "%s reg(0x%x), ret(%d) retry(%d) after now\n",
+							__func__, reg, ret, retry);
+			msleep(40);
+			ret = i2c_smbus_read_i2c_block_data(i2c, reg, count, buf);
+		} else
+			break;
+	}
+
+	if (ret < 0) {
+		dev_err(dev, "%s failed to read reg, ret(%d)\n", __func__, ret);
+#else
 	if (ret < 0) {
 		dev_err(dev, "%s reg(0x%x), ret(%d)\n", __func__, reg, ret);
+#endif
+
 #if defined(CONFIG_USB_HW_PARAM)
 		if (o_notify)
 			inc_hw_param(o_notify, USB_CCIC_I2C_ERROR_COUNT);
@@ -2040,7 +2059,7 @@ static void s2mu004_usbpd_init_configure(struct s2mu004_usbpd_data *_data)
 	struct i2c_client *i2c = _data->i2c;
 	struct device *dev = _data->dev;
 	u8 rid = 0;
-	bool pdic_port = 0;
+	int pdic_port = 0;
 
 	s2mu004_usbpd_read_reg(i2c, S2MU004_REG_ADC_STATUS, &rid);
 
@@ -2248,7 +2267,9 @@ static int s2mu004_usbpd_suspend(struct device *dev)
 	if (device_may_wakeup(dev))
 		enable_irq_wake(pdic_data->i2c->irq);
 
+#ifndef CONFIG_SEC_FACTORY
 	disable_irq(pdic_data->i2c->irq);
+#endif
 
 	return 0;
 }
@@ -2261,7 +2282,9 @@ static int s2mu004_usbpd_resume(struct device *dev)
 	if (device_may_wakeup(dev))
 		disable_irq_wake(pdic_data->i2c->irq);
 
+#ifndef CONFIG_SEC_FACTORY
 	enable_irq(pdic_data->i2c->irq);
+#endif
 
 	return 0;
 }
